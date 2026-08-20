@@ -99,8 +99,12 @@ input::placeholder{color:#41506B}
 .scanhead span{display:block;font-size:13.5px;color:#95A1B4;margin-top:6px}
 .scanfoot{position:relative;z-index:2;margin-top:auto;padding:0 22px calc(env(safe-area-inset-bottom) + 26px);text-align:center}
 .scanfoot .hint{font-size:12.5px;color:#7C8798;margin-bottom:14px;min-height:18px}
-.cancel{width:100%;padding:15px;border-radius:12px;border:1px solid #2B3A55;background:rgba(14,23,38,.7);
+.scanbtns{display:flex;gap:10px}
+.cancel{flex:1;padding:15px;border-radius:12px;border:1px solid #2B3A55;background:rgba(14,23,38,.7);
   color:var(--paper);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.torch{flex:none;width:56px;border-radius:12px;border:1px solid #2B3A55;background:rgba(14,23,38,.7);
+  color:var(--paper);display:grid;place-items:center;cursor:pointer}
+.torch.on{background:var(--paper);color:var(--ink);border-color:var(--paper)}
 
 /* ---- receipt stub ---- */
 .stubwrap{position:fixed;inset:0;background:rgba(6,11,20,.72);backdrop-filter:blur(3px);
@@ -192,7 +196,14 @@ input::placeholder{color:#41506B}
   </div>
   <div class="scanfoot">
     <div class="hint" id="scanHint">Starting camera…</div>
-    <button class="cancel" id="btnCancel">Cancel</button>
+    <div class="scanbtns">
+      <button class="cancel" id="btnCancel">Cancel</button>
+      <button class="torch" id="btnTorch" hidden aria-label="Toggle flashlight">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+          <path d="M9 3h6l-1 5h3l-7 13 1-8H8z"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -289,66 +300,155 @@ function loadJsQR(){
   return jsqrReady;
 }
 
+/* ---- audio: the confirmation chirp ---- */
+let audio=null;
+function initAudio(){
+  try{
+    audio = audio || new (window.AudioContext||window.webkitAudioContext)();
+    if(audio.state==='suspended') audio.resume();   // iOS needs a user gesture
+  }catch(e){}
+}
+function beep(kind){
+  if(!audio) return;
+  const t0=audio.currentTime;
+  const tone=(freq,at,dur,vol)=>{
+    const o=audio.createOscillator(), g=audio.createGain();
+    o.type='square';                        // cuts through store noise
+    o.frequency.setValueAtTime(freq,t0+at);
+    g.gain.setValueAtTime(0.0001,t0+at);
+    g.gain.exponentialRampToValueAtTime(vol,t0+at+0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+at+dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t0+at); o.stop(t0+at+dur+0.02);
+  };
+  if(kind==='ok'){ tone(1318,0,0.075,0.3); tone(1975,0.075,0.12,0.3); }   // rising two-note
+  else { tone(300,0,0.2,0.25); }                                          // low buzz
+}
+
+let torchOn=false, hintTimer=null, locPromise=null;
+
 async function openScanner(){
+  initAudio();                       // this tap is the gesture iOS requires
+  locPromise = locate();             // warm up GPS now, not after the beep
+  torchOn=false;
+  $('btnTorch').hidden=true;
+  $('btnTorch').classList.remove('on');
   $('scanTitle').textContent = nextAct==='IN' ? 'Scan to time in' : 'Scan to time out';
   $('scanHint').textContent='Starting camera…';
   $('scan').classList.add('on');
   scanning=true;
+
   try{
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+    stream=await navigator.mediaDevices.getUserMedia({video:{
+      facingMode:{ideal:'environment'},
+      width:{ideal:1280}, height:{ideal:720},
+      advanced:[{focusMode:'continuous'}]      // ignored where unsupported
+    }});
     const v=$('video'); v.srcObject=stream; await v.play();
-    $('scanHint').textContent='Hold steady on the code';
+    setupTorch();
+    $('scanHint').textContent='Fill the box with the code';
+
+    clearTimeout(hintTimer);
+    hintTimer=setTimeout(()=>{
+      if(scanning) $('scanHint').textContent='Struggling? Move closer, wipe the lens, or tap the flashlight.';
+    },7000);
+
     ('BarcodeDetector' in window) ? nativeLoop() : fallbackLoop();
   }catch(e){
     $('scanHint').textContent='Camera blocked. Allow camera access in your browser settings.';
   }
 }
 
+function setupTorch(){
+  try{
+    const track=stream.getVideoTracks()[0];
+    const caps=track.getCapabilities ? track.getCapabilities() : {};
+    if(!caps.torch) return;
+    $('btnTorch').hidden=false;
+    $('btnTorch').onclick=async()=>{
+      torchOn=!torchOn;
+      try{
+        await track.applyConstraints({advanced:[{torch:torchOn}]});
+        $('btnTorch').classList.toggle('on',torchOn);
+      }catch(e){ $('btnTorch').hidden=true; }
+    };
+  }catch(e){}
+}
+
 function closeScanner(){
   scanning=false;
+  clearTimeout(hintTimer);
   if(rafId) cancelAnimationFrame(rafId);
-  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }   // also kills the torch
   $('video').srcObject=null;
   $('scan').classList.remove('on');
 }
 
-async function nativeLoop(){
+function nativeLoop(){
   const det=new BarcodeDetector({formats:['qr_code']});
+  let busy=false;
   const step=async()=>{
     if(!scanning) return;
+    rafId=requestAnimationFrame(step);
+    if(busy) return;
+    busy=true;
     try{
       const codes=await det.detect($('video'));
-      if(codes.length){ const q=parseQR(codes[0].rawValue); if(q) return onCode(q); notThisCode(); }
+      if(codes.length){
+        const q=parseQR(codes[0].rawValue);
+        if(q) return onCode(q);
+        notThisCode();
+      }
     }catch(e){}
-    rafId=requestAnimationFrame(step);
+    busy=false;
   };
-  step();
+  rafId=requestAnimationFrame(step);
 }
 
 async function fallbackLoop(){
   try{ await loadJsQR(); }
   catch(e){ $('scanHint').textContent='Scanner unavailable offline. Reconnect and reopen.'; return; }
-  const v=$('video'), c=document.createElement('canvas'), ctx=c.getContext('2d',{willReadFrequently:true});
-  const step=()=>{
+
+  const v=$('video');
+  const SIDE=420;                                   // decode buffer, square
+  const c=document.createElement('canvas');
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  c.width=c.height=SIDE;
+  let last=0;
+
+  const step=(ts)=>{
     if(!scanning) return;
-    if(v.readyState===v.HAVE_ENOUGH_DATA){
-      const w=Math.min(560,v.videoWidth||560);
-      const scale=w/(v.videoWidth||w);
-      c.width=w; c.height=(v.videoHeight||w)*scale;
-      ctx.drawImage(v,0,0,c.width,c.height);
-      const img=ctx.getImageData(0,0,c.width,c.height);
-      const res=window.jsQR&&window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
-      if(res){ const q=parseQR(res.data); if(q) return onCode(q); notThisCode(); }
-    }
     rafId=requestAnimationFrame(step);
+    if(ts-last<80) return;                          // ~12 reads/sec is plenty
+    last=ts;
+    if(v.readyState!==v.HAVE_ENOUGH_DATA) return;
+
+    /* Crop the centre square only — matches the reticle, so the code fills
+       the buffer instead of being a small patch in a wide frame. */
+    const vw=v.videoWidth, vh=v.videoHeight;
+    if(!vw||!vh) return;
+    const side=Math.min(vw,vh)*0.65;
+    ctx.drawImage(v,(vw-side)/2,(vh-side)/2,side,side,0,0,SIDE,SIDE);
+
+    const img=ctx.getImageData(0,0,SIDE,SIDE);
+    const res=window.jsQR && window.jsQR(img.data,SIDE,SIDE,{inversionAttempts:'dontInvert'});
+    if(res){
+      const q=parseQR(res.data);
+      if(q) return onCode(q);
+      notThisCode();
+    }
   };
-  step();
+  rafId=requestAnimationFrame(step);
 }
 
 let warned=0;
 function notThisCode(){
   const t=Date.now();
-  if(t-warned>1500){ warned=t; $('scanHint').textContent="That isn't a Time Clock code."; }
+  if(t-warned>1500){
+    warned=t;
+    beep('err');
+    $('scanHint').textContent="That isn't a Time Clock code.";
+  }
 }
 
 /* ---------------- location (best effort, never blocking) ---------------- */
@@ -367,12 +467,15 @@ function locate(){
 /* ---------------- punch ---------------- */
 async function onCode(q){
   scanning=false;
+  clearTimeout(hintTimer);
   if(rafId) cancelAnimationFrame(rafId);
-  if(navigator.vibrate) navigator.vibrate(18);
+
+  beep('ok');                                   // instant feedback, before any network
+  if(navigator.vibrate) navigator.vibrate([15,40,15]);
   $('scanHint').textContent='Recording…';
 
   try{
-    const loc=await locate();
+    const loc=await (locPromise||locate());     // usually already resolved
     const r=await call({action:'punch',deviceToken:store.getItem(KEY_TOKEN),
                         siteId:q.siteId,siteKey:q.siteKey,
                         lat:loc.lat,lng:loc.lng,accuracy:loc.accuracy,clientTime:Date.now()});
