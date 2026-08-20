@@ -105,7 +105,7 @@ var $ = function (id) { return document.getElementById(id); };
 var siteId = '', siteKey = '', appUrl = '';
 
 function svgQR(text) {
-  var qr = qrcode(0, 'H');            // level H survives tape, glare and smudges
+  var qr = qrcode(0, 'Q');            // Q = 41 modules, 20% bigger than H, still 25% damage tolerance
   qr.addData(text);
   qr.make();
   var n = qr.getModuleCount(), q = 4, size = n + q * 2, d = '';
