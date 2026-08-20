@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time Clock — printable poster</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0E1726;--in:#2F9E6E;--muted:#7A8496;--rule:#D5D2C8}
+*{box-sizing:border-box}
+body{margin:0;background:#4A5568;font-family:'Archivo',system-ui,sans-serif;color:var(--ink);padding:26px 16px}
+.mono{font-family:'IBM Plex Mono',monospace}
+
+/* control bar — never printed */
+.bar{max-width:210mm;margin:0 auto 20px;background:#0E1726;color:#EFEEE8;border-radius:12px;padding:18px 20px}
+.bar h1{font-size:16px;margin:0 0 4px;font-weight:700}
+.bar p{font-size:13px;color:#9AA6B8;margin:0 0 14px;line-height:1.5}
+.bar label{display:block;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#6A768A;font-weight:600;margin:12px 0 6px}
+.bar input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid #26344F;background:#16233A;color:#EFEEE8;font-family:inherit;font-size:15px}
+.bar button{margin-top:16px;padding:13px 22px;border:0;border-radius:9px;background:#EFEEE8;color:#0E1726;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.warn{margin-top:14px;font-size:12.5px;color:#F0938C;line-height:1.5}
+
+/* the poster itself */
+.sheet{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:24mm 20mm;
+  display:flex;flex-direction:column;box-shadow:0 20px 60px -20px rgba(0,0,0,.6)}
+.brandline{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:10pt;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:600;
+  border-bottom:2px solid var(--ink);padding-bottom:10px}
+.headline{font-size:40pt;font-weight:800;letter-spacing:-.03em;line-height:1;margin:16mm 0 4mm}
+.branch{font-size:17pt;color:var(--muted);font-weight:500;margin:0}
+.qrbox{margin:12mm auto;padding:8mm;border:3px solid var(--ink);border-radius:6px;background:#fff}
+#qr{display:block;width:88mm;height:88mm}
+.steps{margin:0 0 auto;padding:0;list-style:none;counter-reset:s}
+.steps li{counter-increment:s;display:flex;gap:12px;align-items:flex-start;padding:7px 0;font-size:13.5pt;line-height:1.35}
+.steps li::before{content:counter(s);flex:none;width:26px;height:26px;border-radius:50%;background:var(--in);
+  color:#fff;font-size:11pt;font-weight:700;display:grid;place-items:center;margin-top:2px}
+.fine{border-top:1px solid var(--rule);margin-top:10mm;padding-top:5mm;display:flex;justify-content:space-between;
+  gap:16px;font-size:9pt;color:var(--muted);line-height:1.5}
+
+@media print{
+  body{background:#fff;padding:0}
+  .bar{display:none}
+  .sheet{box-shadow:none;margin:0;width:auto;min-height:auto;padding:16mm}
+  @page{size:A4 portrait;margin:8mm}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h1>Printable time clock poster</h1>
+  <p>The QR is drawn in this browser — the site secret is never sent to any QR service. Fill in the branch name, then print and tape it up where staff arrive.</p>
+  <label for="branch">Branch name shown on the poster</label>
+  <input id="branch" placeholder="Ayala Branch">
+  <button onclick="window.print()">Print poster</button>
+  <div class="warn" id="warn" hidden></div>
+</div>
+
+<div class="sheet">
+  <div class="brandline"><span>Employee time clock</span><span class="mono" id="siteTag">—</span></div>
+
+  <h1 class="headline">Scan to clock<br>in and out.</h1>
+  <p class="branch" id="branchOut">—</p>
+
+  <div class="qrbox"><canvas id="qr"></canvas></div>
+
+  <ol class="steps">
+    <li>Open the <strong>Time Clock</strong> app on your phone.</li>
+    <li>Tap the big button — it already knows whether you're timing in or out.</li>
+    <li>Point your camera at this code and hold steady.</li>
+    <li>Wait for the receipt on screen. That's your proof it was recorded.</li>
+  </ol>
+
+  <div class="fine">
+    <span>Photographing this code does not let you clock in from elsewhere — your phone's location is recorded with every scan and mismatches are flagged for your supervisor.</span>
+    <span class="mono" id="printed">—</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+const p = new URLSearchParams(location.hash.slice(1));
+const siteId = (p.get('s') || '').toUpperCase();
+const key    = p.get('k') || '';
+
+/* The QR points at the app itself, not this poster page. */
+const appUrl = location.href.replace(/poster\.html.*$/, '') + '#s=' + siteId + '&k=' + key;
+
+document.getElementById('siteTag').textContent = siteId || 'NO SITE';
+document.getElementById('printed').textContent =
+  'Printed ' + new Date().toLocaleDateString(undefined, { day:'2-digit', month:'short', year:'numeric' });
+
+const branch = document.getElementById('branch');
+const out = document.getElementById('branchOut');
+branch.value = siteId;
+out.textContent = siteId;
+branch.addEventListener('input', () => out.textContent = branch.value || siteId);
+
+if (!siteId || !key) {
+  const w = document.getElementById('warn');
+  w.hidden = false;
+  w.textContent = 'No site in the link. Use the exact URL from Time Clock → Add a store in your spreadsheet.';
+} else {
+  QRCode.toCanvas(document.getElementById('qr'), appUrl, {
+    errorCorrectionLevel: 'H',   // survives smudges, tape and glare
+    margin: 1,
+    width: 900,
+    color: { dark: '#0E1726', light: '#FFFFFF' }
+  });
+}
+</script>
+</body>
+</html>
