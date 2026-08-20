@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1726">
+<title>Time Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#0E1726; --ground-2:#16233A; --paper:#EFEEE8; --rule:#D5D2C8;
+  --ink:#0E1726; --muted:#6A768A; --paper-muted:#847F73;
+  --in:#2F9E6E; --out:#B3620E; --alert:#C2453C; --pad:20px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--ground);color:var(--paper);
+  font-family:'Archivo',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.45;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);overscroll-behavior:none}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.app{max-width:460px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:0 var(--pad)}
+.screen{display:none;flex:1;flex-direction:column}
+.screen.on{display:flex}
+
+.top{display:flex;justify-content:space-between;align-items:baseline;padding:22px 0 0}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.chip{font-size:11px;letter-spacing:.1em;color:var(--muted);border:1px solid #253352;border-radius:999px;padding:3px 9px}
+
+.who{margin:24px 0 0}
+.who h1{font-size:30px;line-height:1.1;font-weight:800;margin:0;letter-spacing:-.02em}
+.state{margin-top:8px;font-size:14px;color:#A9B4C6;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.dot.live{background:var(--in);box-shadow:0 0 0 0 rgba(47,158,110,.5);animation:pulse 2.4s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 9px rgba(47,158,110,0)}100%{box-shadow:0 0 0 0 rgba(47,158,110,0)}}
+
+.clock{margin:18px 0 0;font-size:50px;font-weight:500;letter-spacing:-.03em;line-height:1}
+.clock small{font-size:14px;color:var(--muted);letter-spacing:.02em;display:block;margin-top:6px;font-weight:400}
+
+.punchwrap{margin:auto 0;padding:22px 0}
+.punch{width:100%;border:0;border-radius:22px;padding:24px 22px;display:flex;align-items:center;
+  justify-content:space-between;gap:14px;font-family:inherit;color:#fff;background:var(--in);
+  box-shadow:0 12px 30px -12px rgba(47,158,110,.7);
+  transition:transform .12s ease,box-shadow .12s ease,background .2s ease;cursor:pointer;text-align:left}
+.punch[data-act="OUT"]{background:var(--out);box-shadow:0 12px 30px -12px rgba(179,98,14,.7)}
+.punch:active{transform:scale(.975)}
+.punch:disabled{opacity:.55;box-shadow:none}
+.punch:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.punch b{display:block;font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.punch span{display:block;font-size:12.5px;opacity:.82;letter-spacing:.04em;text-transform:uppercase;margin-top:4px;font-weight:500}
+.qricon{flex:none;opacity:.75}
+
+.log{border-top:1px solid #1F2C45;padding:16px 0 10px}
+.log h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:600}
+.entry{display:flex;align-items:center;gap:11px;padding:6px 0;font-size:14px}
+.tag{font-size:10px;font-weight:600;letter-spacing:.1em;padding:2px 7px;border-radius:4px;background:rgba(47,158,110,.16);color:#5BC793}
+.entry[data-act="OUT"] .tag{background:rgba(179,98,14,.18);color:#E09A4D}
+.entry time{color:#C7D0DE}
+.entry .place{margin-left:auto;font-size:11.5px;color:#4B586E}
+.entry .flag{margin-left:auto;font-size:11px;color:var(--alert)}
+.empty{color:var(--muted);font-size:14px;padding:2px 0 6px}
+
+.foot{padding:10px 0 24px;font-size:11.5px;color:#4B586E;display:flex;justify-content:space-between;gap:12px}
+.foot button{background:none;border:0;color:#4B586E;font:inherit;text-decoration:underline;cursor:pointer;padding:0}
+
+.reg{padding:32px 0 0}
+.reg h1{font-size:29px;font-weight:800;margin:14px 0 8px;letter-spacing:-.02em}
+.reg p{color:#9AA6B8;font-size:14.5px;margin:0 0 22px}
+label{display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:18px 0 7px}
+input{width:100%;padding:15px 16px;border-radius:12px;border:1px solid #26344F;background:var(--ground-2);
+  color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.08em;text-transform:uppercase}
+input:focus{outline:2px solid #3D5479;outline-offset:1px;border-color:transparent}
+input::placeholder{color:#41506B}
+.go{width:100%;margin-top:24px;padding:17px;border:0;border-radius:12px;background:var(--paper);
+  color:var(--ink);font-family:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.go:disabled{opacity:.5}
+.note{margin-top:18px;font-size:12.5px;color:#4B586E;line-height:1.5}
+
+.msg{margin-top:14px;padding:12px 14px;border-radius:10px;font-size:14px;display:none}
+.msg.on{display:block}
+.msg.bad{background:rgba(194,69,60,.14);color:#F0938C;border:1px solid rgba(194,69,60,.3)}
+.msg.good{background:rgba(47,158,110,.14);color:#7FD6AB;border:1px solid rgba(47,158,110,.3)}
+
+/* ---- scanner ---- */
+.scan{position:fixed;inset:0;z-index:50;background:#05090F;display:none;flex-direction:column}
+.scan.on{display:flex}
+.scan video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.mask{position:absolute;inset:0;display:grid;place-items:center;
+  background:radial-gradient(circle at center,transparent 0,transparent 130px,rgba(5,9,15,.78) 132px)}
+.reticle{width:246px;height:246px;position:relative}
+.reticle i{position:absolute;width:34px;height:34px;border:3px solid var(--paper);border-radius:3px}
+.reticle i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0}
+.reticle i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0}
+.reticle i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0}
+.reticle i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0}
+.scanhead{position:relative;z-index:2;padding:calc(env(safe-area-inset-top) + 22px) 22px 0;text-align:center}
+.scanhead b{display:block;font-size:20px;font-weight:800;letter-spacing:-.01em}
+.scanhead span{display:block;font-size:13.5px;color:#95A1B4;margin-top:6px}
+.scanfoot{position:relative;z-index:2;margin-top:auto;padding:0 22px calc(env(safe-area-inset-bottom) + 26px);text-align:center}
+.scanfoot .hint{font-size:12.5px;color:#7C8798;margin-bottom:14px;min-height:18px}
+.cancel{width:100%;padding:15px;border-radius:12px;border:1px solid #2B3A55;background:rgba(14,23,38,.7);
+  color:var(--paper);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
+
+/* ---- receipt stub ---- */
+.stubwrap{position:fixed;inset:0;background:rgba(6,11,20,.72);backdrop-filter:blur(3px);
+  display:flex;align-items:flex-end;justify-content:center;padding:16px;z-index:60;
+  opacity:0;pointer-events:none;transition:opacity .2s ease}
+.stubwrap.on{opacity:1;pointer-events:auto}
+.stub{width:100%;max-width:428px;background:var(--paper);color:var(--ink);border-radius:4px;
+  padding:30px 26px 26px;position:relative;transform:translateY(110%);
+  transition:transform .42s cubic-bezier(.16,.9,.3,1)}
+.stubwrap.on .stub{transform:translateY(0)}
+.stub::before{content:"";position:absolute;top:-9px;left:0;right:0;height:10px;
+  background-image:radial-gradient(circle at 9px 10px,transparent 8px,var(--paper) 8.5px);background-size:18px 10px}
+.stub .rowline{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--paper-muted);font-weight:600}
+.stub .act{font-size:15px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;margin:18px 0 2px;color:var(--in)}
+.stub[data-act="OUT"] .act{color:var(--out)}
+.stub .time{font-size:54px;font-weight:600;letter-spacing:-.04em;line-height:1;margin:0}
+.stub .name{font-size:17px;font-weight:600;margin:12px 0 0}
+.stub .meta{border-top:1px dashed var(--rule);margin-top:16px;padding-top:13px;font-size:12px;
+  color:var(--paper-muted);display:flex;justify-content:space-between;gap:10px}
+.stub .warn{color:var(--alert);font-size:12.5px;margin-top:12px;font-weight:500}
+.stub .close{margin-top:20px;width:100%;padding:14px;border:1px solid var(--rule);background:none;
+  border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.stub{transform:none}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ REGISTER ============ -->
+  <section class="screen reg" id="screenReg">
+    <div class="top"><span class="eyebrow">Time Clock</span><span class="chip mono" id="regDate"></span></div>
+    <h1>Set up this phone</h1>
+    <p>Once only. After this, you scan the QR at the store to clock in and out.</p>
+
+    <label for="empId">Employee ID</label>
+    <input id="empId" placeholder="EMP-001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+
+    <label for="regCode">Registration code</label>
+    <input id="regCode" placeholder="6 characters" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="8">
+
+    <button class="go" id="btnReg">Register this phone</button>
+    <div class="msg" id="regMsg"></div>
+    <p class="note">Ask HR for your registration code. It works once and ties your attendance to this handset — don't register on a phone that isn't yours.</p>
+  </section>
+
+  <!-- ============ PUNCH ============ -->
+  <section class="screen" id="screenPunch">
+    <div class="top"><span class="eyebrow">Time Clock</span><span class="chip mono" id="empChip">—</span></div>
+
+    <div class="who">
+      <h1 id="name">—</h1>
+      <div class="state"><span class="dot" id="dot"></span><span id="stateText">Checking…</span></div>
+    </div>
+
+    <div class="clock mono" id="clock">--:--:--<small id="today">—</small></div>
+
+    <div class="punchwrap">
+      <button class="punch" id="btnPunch" data-act="IN" disabled>
+        <span><b id="punchLabel">Loading</b><span id="punchSub">one moment</span></span>
+        <svg class="qricon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2M14 21h3"/>
+        </svg>
+      </button>
+      <div class="msg" id="punchMsg"></div>
+    </div>
+
+    <div class="log">
+      <h2>Today</h2>
+      <div id="entries"><div class="empty">No punches yet today.</div></div>
+    </div>
+
+    <div class="foot">
+      <span class="mono" id="devLabel"></span>
+      <button id="btnReset">Unregister this phone</button>
+    </div>
+  </section>
+</div>
+
+<!-- ============ SCANNER ============ -->
+<div class="scan" id="scan">
+  <video id="video" playsinline muted></video>
+  <div class="mask"><div class="reticle"><i></i><i></i><i></i><i></i></div></div>
+  <div class="scanhead">
+    <b id="scanTitle">Scan to time in</b>
+    <span>Point at the poster by the counter</span>
+  </div>
+  <div class="scanfoot">
+    <div class="hint" id="scanHint">Starting camera…</div>
+    <button class="cancel" id="btnCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ============ STUB ============ -->
+<div class="stubwrap" id="stubWrap">
+  <div class="stub" id="stub" data-act="IN">
+    <div class="rowline"><span>Attendance record</span><span class="mono" id="stubId">—</span></div>
+    <div class="act" id="stubAct">Timed in</div>
+    <p class="time mono" id="stubTime">--:--:--</p>
+    <p class="name" id="stubName">—</p>
+    <div class="meta"><span class="mono" id="stubDate">—</span><span class="mono" id="stubSite">—</span></div>
+    <div class="warn" id="stubWarn" hidden></div>
+    <button class="close" id="stubClose">Done</button>
+  </div>
+</div>
+
+<script>
+/* ================= CONFIGURE THESE TWO ================= */
+const API_URL = 'PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE';   // ends in /exec
+const APP_KEY = 'PASTE_THE_app_key_FROM_THE_SETTINGS_SHEET';
+/* ====================================================== */
+
+const store = (() => {
+  try { const k='__t'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return localStorage; }
+  catch (e) { const m={}; return { getItem:k=>(k in m?m[k]:null), setItem:(k,v)=>m[k]=String(v), removeItem:k=>delete m[k] }; }
+})();
+
+const $ = id => document.getElementById(id);
+const KEY_TOKEN='tc_device_token', KEY_LABEL='tc_device_label';
+let nextAct='IN', stream=null, scanning=false, rafId=null;
+
+/* text/plain keeps this a "simple" request so the browser skips the
+   CORS preflight that Apps Script cannot answer. */
+async function call(payload){
+  const res = await fetch(API_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({appKey:APP_KEY},payload)),
+    redirect:'follow'
+  });
+  return res.json();
+}
+
+function say(el,text,kind){
+  el.textContent=text; el.className='msg on '+(kind||'');
+  if(kind==='good') setTimeout(()=>el.className='msg',5000);
+}
+
+/* ---------------- registration ---------------- */
+function newToken(){
+  const b=new Uint8Array(20); crypto.getRandomValues(b);
+  return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
+}
+function deviceLabel(){
+  const m=navigator.userAgent.match(/(iPhone|iPad|Android[^;)]*|Windows|Macintosh)/);
+  return (m?m[1]:'Phone').replace(/\s+/g,' ').slice(0,30);
+}
+
+$('btnReg').addEventListener('click',async()=>{
+  const id=$('empId').value.trim(), code=$('regCode').value.trim();
+  if(!id||!code) return say($('regMsg'),'Enter both your employee ID and code.','bad');
+  $('btnReg').disabled=true; $('btnReg').textContent='Registering…';
+  const token=store.getItem(KEY_TOKEN)||newToken();
+  try{
+    const r=await call({action:'register',employeeId:id,regCode:code,deviceToken:token,
+                        label:deviceLabel(),userAgent:navigator.userAgent});
+    if(!r.ok){ say($('regMsg'),r.message||r.error,'bad'); return; }
+    store.setItem(KEY_TOKEN,token); store.setItem(KEY_LABEL,deviceLabel());
+    say($('regMsg'),r.message,'good');
+    setTimeout(boot,900);
+  }catch(e){ say($('regMsg'),'Could not reach the server. Check your connection.','bad'); }
+  finally{ $('btnReg').disabled=false; $('btnReg').textContent='Register this phone'; }
+});
+
+/* ---------------- QR payload ---------------- */
+/* Poster encodes:  https://you.github.io/timeclock/#s=STORE01&k=<secret> */
+function parseQR(text){
+  if(!text) return null;
+  const s=/[#&?]s=([A-Za-z0-9_-]+)/.exec(text);
+  const k=/[#&?]k=([A-Za-z0-9_-]+)/.exec(text);
+  if(!s||!k) return null;
+  return { siteId:s[1].toUpperCase(), siteKey:k[1] };
+}
+
+/* ---------------- scanner ---------------- */
+let jsqrReady=null;
+function loadJsQR(){
+  if(jsqrReady) return jsqrReady;
+  jsqrReady=new Promise((ok,fail)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+    s.onload=ok; s.onerror=fail; document.head.appendChild(s);
+  });
+  return jsqrReady;
+}
+
+async function openScanner(){
+  $('scanTitle').textContent = nextAct==='IN' ? 'Scan to time in' : 'Scan to time out';
+  $('scanHint').textContent='Starting camera…';
+  $('scan').classList.add('on');
+  scanning=true;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+    const v=$('video'); v.srcObject=stream; await v.play();
+    $('scanHint').textContent='Hold steady on the code';
+    ('BarcodeDetector' in window) ? nativeLoop() : fallbackLoop();
+  }catch(e){
+    $('scanHint').textContent='Camera blocked. Allow camera access in your browser settings.';
+  }
+}
+
+function closeScanner(){
+  scanning=false;
+  if(rafId) cancelAnimationFrame(rafId);
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  $('video').srcObject=null;
+  $('scan').classList.remove('on');
+}
+
+async function nativeLoop(){
+  const det=new BarcodeDetector({formats:['qr_code']});
+  const step=async()=>{
+    if(!scanning) return;
+    try{
+      const codes=await det.detect($('video'));
+      if(codes.length){ const q=parseQR(codes[0].rawValue); if(q) return onCode(q); notThisCode(); }
+    }catch(e){}
+    rafId=requestAnimationFrame(step);
+  };
+  step();
+}
+
+async function fallbackLoop(){
+  try{ await loadJsQR(); }
+  catch(e){ $('scanHint').textContent='Scanner unavailable offline. Reconnect and reopen.'; return; }
+  const v=$('video'), c=document.createElement('canvas'), ctx=c.getContext('2d',{willReadFrequently:true});
+  const step=()=>{
+    if(!scanning) return;
+    if(v.readyState===v.HAVE_ENOUGH_DATA){
+      const w=Math.min(560,v.videoWidth||560);
+      const scale=w/(v.videoWidth||w);
+      c.width=w; c.height=(v.videoHeight||w)*scale;
+      ctx.drawImage(v,0,0,c.width,c.height);
+      const img=ctx.getImageData(0,0,c.width,c.height);
+      const res=window.jsQR&&window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+      if(res){ const q=parseQR(res.data); if(q) return onCode(q); notThisCode(); }
+    }
+    rafId=requestAnimationFrame(step);
+  };
+  step();
+}
+
+let warned=0;
+function notThisCode(){
+  const t=Date.now();
+  if(t-warned>1500){ warned=t; $('scanHint').textContent="That isn't a Time Clock code."; }
+}
+
+/* ---------------- location (best effort, never blocking) ---------------- */
+function locate(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation) return resolve({});
+    let done=false;
+    const finish=v=>{ if(!done){ done=true; resolve(v); } };
+    setTimeout(()=>finish({}),4000);
+    navigator.geolocation.getCurrentPosition(
+      p=>finish({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy)}),
+      ()=>finish({}), {enableHighAccuracy:true,timeout:3800,maximumAge:30000});
+  });
+}
+
+/* ---------------- punch ---------------- */
+async function onCode(q){
+  scanning=false;
+  if(rafId) cancelAnimationFrame(rafId);
+  if(navigator.vibrate) navigator.vibrate(18);
+  $('scanHint').textContent='Recording…';
+
+  try{
+    const loc=await locate();
+    const r=await call({action:'punch',deviceToken:store.getItem(KEY_TOKEN),
+                        siteId:q.siteId,siteKey:q.siteKey,
+                        lat:loc.lat,lng:loc.lng,accuracy:loc.accuracy,clientTime:Date.now()});
+    closeScanner();
+    if(!r.ok){ say($('punchMsg'),r.message||r.error,'bad'); return; }
+    showStub(r);
+    refresh();
+  }catch(e){
+    closeScanner();
+    say($('punchMsg'),'No connection. Nothing was recorded — try again.','bad');
+  }
+}
+
+$('btnPunch').addEventListener('click',openScanner);
+$('btnCancel').addEventListener('click',closeScanner);
+
+/* ---------------- receipt ---------------- */
+function showStub(r){
+  $('stub').dataset.act=r.action;
+  $('stubAct').textContent = r.action==='IN' ? 'Timed in' : 'Timed out';
+  $('stubTime').textContent=r.time;
+  $('stubName').textContent=r.name;
+  $('stubId').textContent=r.employeeId;
+  $('stubDate').textContent=r.date;
+  $('stubSite').textContent=r.site||'';
+  const flags=r.flags||[], w=$('stubWarn');
+  if(flags.length){
+    w.hidden=false;
+    w.textContent = flags.includes('GPS_FAR_FROM_SITE')
+      ? 'Recorded, but your phone reports a location away from this branch. Your supervisor will see this.'
+      : flags.includes('CLOCK_DRIFT') ? 'Recorded, but your device clock looks wrong.'
+      : 'Recorded without location.';
+  } else w.hidden=true;
+  $('stubWrap').classList.add('on');
+  setTimeout(closeStub,6000);
+}
+function closeStub(){ $('stubWrap').classList.remove('on'); }
+$('stubClose').addEventListener('click',closeStub);
+$('stubWrap').addEventListener('click',e=>{ if(e.target===$('stubWrap')) closeStub(); });
+
+/* ---------------- render ---------------- */
+function render(s){
+  $('name').textContent=s.name;
+  $('empChip').textContent=s.employeeId;
+  $('devLabel').textContent=store.getItem(KEY_LABEL)||'This phone';
+  setNext(s.nextAction);
+
+  const onDuty=s.nextAction==='OUT';
+  $('dot').className='dot'+(onDuty?' live':'');
+  const lastIn=[...(s.punches||[])].reverse().find(p=>p.action==='IN');
+  $('stateText').textContent = onDuty ? 'On duty since '+hhmm(lastIn?lastIn.time:'')
+    : (s.punches&&s.punches.length ? 'Off duty' : 'Not clocked in today');
+
+  const box=$('entries');
+  if(!s.punches||!s.punches.length){ box.innerHTML='<div class="empty">No punches yet today.</div>'; return; }
+  box.innerHTML=s.punches.map(p=>
+    '<div class="entry" data-act="'+p.action+'">'+
+      '<span class="tag">'+p.action+'</span>'+
+      '<time class="mono">'+hhmm(p.time)+'</time>'+
+      (p.flags ? '<span class="flag">'+p.flags.split(',')[0].replace(/_/g,' ').toLowerCase()+'</span>'
+               : '<span class="place">'+(p.site||'')+'</span>')+
+    '</div>').join('');
+}
+
+function setNext(act){
+  nextAct=act;
+  $('btnPunch').dataset.act=act;
+  $('btnPunch').disabled=false;
+  $('punchLabel').textContent = act==='IN' ? 'Scan to time in' : 'Scan to time out';
+  $('punchSub').textContent = act==='IN' ? 'Start your shift' : 'End your shift';
+}
+
+function hhmm(t){
+  if(!t) return '—';
+  const [h,m]=t.split(':').map(Number);
+  return (h%12||12)+':'+String(m).padStart(2,'0')+' '+(h>=12?'PM':'AM');
+}
+
+/* ---------------- lifecycle ---------------- */
+async function refresh(){
+  const token=store.getItem(KEY_TOKEN);
+  if(!token) return show('screenReg');
+  try{
+    const s=await call({action:'status',deviceToken:token});
+    if(!s.ok){
+      if(s.error==='UNREGISTERED_DEVICE'||s.error==='NO_DEVICE'){ store.removeItem(KEY_TOKEN); return show('screenReg'); }
+      show('screenPunch');
+      say($('punchMsg'),s.message||s.error,'bad');
+      $('btnPunch').disabled=true;
+      $('punchLabel').textContent='Unavailable'; $('punchSub').textContent='contact HR';
+      return;
+    }
+    show('screenPunch'); render(s);
+    /* Opened straight from the phone's own camera app? Punch immediately. */
+    const q=parseQR(location.hash);
+    if(q){ history.replaceState(null,'',location.pathname); onCode(q); }
+  }catch(e){
+    show('screenPunch');
+    say($('punchMsg'),'Offline. Reconnect to clock in.','bad');
+  }
+}
+
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); }
+
+function tick(){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  $('clock').firstChild.nodeValue=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  $('today').textContent=d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
+  $('regDate').textContent=d.toLocaleDateString(undefined,{day:'2-digit',month:'short'}).toUpperCase();
+}
+
+$('btnReset').addEventListener('click',()=>{
+  if(!confirm('Unregister this phone? You will need a new code from HR to clock in again.')) return;
+  store.removeItem(KEY_TOKEN); show('screenReg');
+});
+
+function boot(){ tick(); refresh(); }
+setInterval(tick,1000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&!scanning) refresh(); });
+boot();
+</script>
+</body>
+</html>
