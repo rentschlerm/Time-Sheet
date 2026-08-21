@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1726">
+<title>Payroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#0E1726; --card:#16233A; --line:#243350; --paper:#EFEEE8; --rule:#D5D2C8;
+  --ink:#0E1726; --muted:#6A768A; --dim:#9AA6B8; --in:#2F9E6E; --out:#B3620E;
+  --alert:#C2453C; --pad:18px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--ground);color:var(--paper);
+  font-family:'Archivo',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.45;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.app{max-width:520px;margin:0 auto;padding:0 var(--pad) 96px}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px;font-weight:600}
+
+.top{display:flex;justify-content:space-between;align-items:baseline;padding:20px 0 2px}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.linkbtn{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
+
+.screen{display:none}.screen.on{display:block}
+
+/* login */
+.login{padding-top:14vh;text-align:center}
+.login h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:12px 0 6px}
+.login p{color:var(--dim);font-size:14.5px;margin:0 auto 26px;max-width:300px}
+.pin{width:100%;max-width:260px;margin:0 auto;display:block;padding:16px;border-radius:12px;
+  border:1px solid var(--line);background:var(--card);color:var(--paper);
+  font-family:'IBM Plex Mono',monospace;font-size:26px;letter-spacing:.3em;text-align:center}
+.pin:focus{outline:2px solid #3D5479;border-color:transparent}
+
+label{display:block;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:14px 0 6px}
+input,select{width:100%;padding:13px 14px;border-radius:10px;border:1px solid var(--line);
+  background:var(--card);color:var(--paper);font-family:inherit;font-size:16px}
+input.mono{font-family:'IBM Plex Mono',monospace}
+input:focus,select:focus{outline:2px solid #3D5479;outline-offset:1px;border-color:transparent}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+button.primary{width:100%;margin-top:20px;padding:16px;border:0;border-radius:12px;background:var(--paper);
+  color:var(--ink);font-family:inherit;font-size:16px;font-weight:700;cursor:pointer}
+button.primary:disabled{opacity:.5}
+button.sec{padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:none;
+  color:var(--paper);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+button.danger{border-color:rgba(194,69,60,.4);color:#F0938C}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:10px}
+.card.tap{cursor:pointer}
+.card.tap:active{transform:scale(.99)}
+.rowflex{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.nm{font-weight:600;font-size:15.5px}
+.sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+.amt{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.pill{font-size:10px;font-weight:600;letter-spacing:.08em;padding:2px 7px;border-radius:5px;
+  background:rgba(47,158,110,.16);color:#5BC793;text-transform:uppercase}
+.pill.warn{background:rgba(194,69,60,.16);color:#F0938C}
+.pill.off{background:rgba(106,118,138,.18);color:var(--muted)}
+
+.total{background:linear-gradient(180deg,#1B2B47,#16233A);border:1px solid #2C3E5F;border-radius:16px;
+  padding:20px;margin:14px 0 4px;text-align:center}
+.total .lab{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.total .big{font-size:38px;font-weight:800;letter-spacing:-.03em;margin:6px 0 2px}
+.total .sub{color:var(--dim);font-size:13px}
+
+.msg{margin-top:14px;padding:12px 14px;border-radius:10px;font-size:14px;display:none}
+.msg.on{display:block}
+.msg.bad{background:rgba(194,69,60,.14);color:#F0938C;border:1px solid rgba(194,69,60,.3)}
+.msg.good{background:rgba(47,158,110,.14);color:#7FD6AB;border:1px solid rgba(47,158,110,.3)}
+.msg.warn{background:rgba(179,98,14,.14);color:#E09A4D;border:1px solid rgba(179,98,14,.3)}
+
+/* tab bar */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(14,23,38,.94);
+  backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;
+  padding:8px 0 calc(env(safe-area-inset-bottom) + 8px)}
+.tabs button{flex:1;background:none;border:0;color:var(--muted);font-family:inherit;font-size:11px;
+  font-weight:600;letter-spacing:.04em;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px}
+.tabs button.on{color:var(--paper)}
+.tabs svg{width:21px;height:21px}
+
+/* sheet modal */
+.sheetwrap{position:fixed;inset:0;background:rgba(6,11,20,.72);backdrop-filter:blur(3px);z-index:40;
+  display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.sheetwrap.on{opacity:1;pointer-events:auto}
+.modal{width:100%;max-width:520px;background:var(--ground);border:1px solid var(--line);
+  border-radius:18px 18px 0 0;padding:8px 18px calc(env(safe-area-inset-bottom) + 20px);
+  max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform .34s cubic-bezier(.16,.9,.3,1)}
+.sheetwrap.on .modal{transform:translateY(0)}
+.grab{width:38px;height:4px;border-radius:3px;background:#2C3B58;margin:8px auto 14px}
+.modal h3{font-size:21px;font-weight:800;letter-spacing:-.02em;margin:0 0 2px}
+.modal .who{font-size:13px;color:var(--muted);margin:0 0 6px}
+
+/* payslip */
+.slip{background:var(--paper);color:var(--ink);border-radius:6px;padding:20px;margin-top:14px}
+.slip .line{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:14px}
+.slip .line.tot{border-top:1px solid var(--rule);margin-top:8px;padding-top:10px;font-weight:700}
+.slip .line.net{border-top:2px solid var(--ink);margin-top:8px;padding-top:12px;font-size:20px;font-weight:800}
+.slip .head{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#847F73;font-weight:600;margin:14px 0 4px}
+.slip .neg{color:var(--out)}
+
+.spinner{width:18px;height:18px;border:2px solid rgba(239,238,232,.25);border-top-color:var(--paper);
+  border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-3px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{color:var(--muted);font-size:14px;padding:10px 0}
+@media print{
+  body{background:#fff;color:#000}
+  .tabs,.top,.no-print{display:none!important}
+  .slip{break-inside:avoid;page-break-inside:avoid;margin-bottom:14px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<section class="screen on" id="scLogin">
+  <div class="app login">
+    <div class="eyebrow">Time Clock</div>
+    <h1>Payroll</h1>
+    <p id="loginSub">Enter your admin PIN.</p>
+    <input class="pin mono" id="pin" type="tel" inputmode="numeric" maxlength="12" placeholder="······" autocomplete="off">
+    <div style="max-width:260px;margin:0 auto">
+      <button class="primary" id="btnLogin">Sign in</button>
+      <div class="msg" id="loginMsg"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== MAIN ===================== -->
+<section class="screen" id="scMain">
+  <div class="app">
+    <div class="top">
+      <span class="eyebrow" id="companyName">—</span>
+      <button class="linkbtn" id="btnOut">Sign out</button>
+    </div>
+
+    <!-- ---- PAYROLL TAB ---- -->
+    <div id="tabPay">
+      <h2>Pay period</h2>
+      <div class="two">
+        <div><label for="from">From</label><input id="from" type="date"></div>
+        <div><label for="to">To</label><input id="to" type="date"></div>
+      </div>
+      <div class="rowflex" style="margin-top:10px;gap:8px">
+        <button class="sec" style="flex:1" id="btnHalf1">1–15</button>
+        <button class="sec" style="flex:1" id="btnHalf2">16–EOM</button>
+        <button class="sec" style="flex:1" id="btnPrev">Last period</button>
+      </div>
+
+      <button class="primary" id="btnCheck">Check attendance first</button>
+      <button class="primary" id="btnCompute" style="background:var(--in);color:#fff">Compute payroll</button>
+      <div class="msg" id="payMsg"></div>
+
+      <div id="payOut"></div>
+    </div>
+
+    <!-- ---- PEOPLE TAB ---- -->
+    <div id="tabPeople" style="display:none">
+      <div class="rowflex" style="margin-top:20px">
+        <h2 style="margin:0">Employees</h2>
+        <button class="sec" id="btnNew">+ Add</button>
+      </div>
+      <div id="peopleOut"><div class="empty">Loading…</div></div>
+    </div>
+
+    <!-- ---- PAYSLIPS TAB ---- -->
+    <div id="tabSlips" style="display:none">
+      <h2>Payslips</h2>
+      <p class="sub" style="margin:0 0 12px">Computed periods only. Print this page to hand out with the cash.</p>
+      <button class="sec no-print" id="btnPrint" style="width:100%">Print all payslips</button>
+      <div id="slipOut"><div class="empty">Compute a payroll period first.</div></div>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button data-tab="tabPay" class="on">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+      Payroll</button>
+    <button data-tab="tabPeople">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 11.5a3 3 0 100-6M17 20a6 6 0 00-2-4.5"/></svg>
+      People</button>
+    <button data-tab="tabSlips">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M8.5 8h7M8.5 12h7"/></svg>
+      Payslips</button>
+  </nav>
+</section>
+
+<!-- ===================== MODAL ===================== -->
+<div class="sheetwrap" id="modalWrap">
+  <div class="modal" id="modal"><div class="grab"></div><div id="modalBody"></div></div>
+</div>
+
+<script>
+/* ================= CONFIGURE THESE TWO ================= */
+const API_URL = 'https://script.google.com/macros/s/AKfycbzuOoSfFeAf2OuiGVTY7xMcQheJqx-Ms9vUgmjbn9LvLoEEQCte3SLPcHfmyU9fw8pN/exec';   // same /exec URL as index.html
+const APP_KEY = 'key-a5e5de5d2981';
+/* ====================================================== */
+
+const store=(()=>{try{const k='__a';localStorage.setItem(k,'1');localStorage.removeItem(k);return localStorage;}
+  catch(e){const m={};return{getItem:k=>(k in m?m[k]:null),setItem:(k,v)=>m[k]=String(v),removeItem:k=>delete m[k]};}})();
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const peso=n=>(Number(n)||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+let TOKEN=store.getItem('pr_token')||'', PEOPLE=[], LAST=null, BOOT=null;
+
+async function call(payload){
+  const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({appKey:APP_KEY,token:TOKEN},payload)),redirect:'follow'});
+  const data=await res.json();
+  if(!data.ok&&data.error==='NO_SESSION'){ signOut('Session expired. Sign in again.'); throw new Error('session'); }
+  return data;
+}
+function say(el,text,kind){ el.textContent=text; el.className='msg on '+(kind||''); }
+function clear(el){ el.className='msg'; }
+function busy(btn,on,label){ btn.disabled=on; btn.innerHTML = on?'<span class="spinner"></span>Working…':label; }
+
+/* ---------------- auth ---------------- */
+$('btnLogin').addEventListener('click',doLogin);
+$('pin').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+
+async function doLogin(){
+  const pin=$('pin').value.trim();
+  if(!pin) return say($('loginMsg'),'Enter your PIN.','bad');
+  busy($('btnLogin'),true);
+  try{
+    const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({appKey:APP_KEY,action:'admin.login',pin}),redirect:'follow'}).then(x=>x.json());
+    if(!r.ok){ say($('loginMsg'),r.message||r.error,'bad'); return; }
+    TOKEN=r.token; store.setItem('pr_token',TOKEN);
+    $('pin').value=''; clear($('loginMsg'));
+    enter();
+  }catch(e){ say($('loginMsg'),'Could not reach the server.','bad'); }
+  finally{ busy($('btnLogin'),false,'Sign in'); }
+}
+
+function signOut(note){
+  TOKEN=''; store.removeItem('pr_token');
+  $('scMain').classList.remove('on'); $('scLogin').classList.add('on');
+  if(note) say($('loginMsg'),note,'warn');
+}
+$('btnOut').addEventListener('click',()=>signOut(''));
+
+async function enter(){
+  $('scLogin').classList.remove('on'); $('scMain').classList.add('on');
+  const b=await call({action:'admin.bootstrap'});
+  if(!b.ok) return;
+  BOOT=b;
+  $('companyName').textContent=b.company;
+  defaultPeriod();
+  if(b.guard) say($('payMsg'),b.guard,'warn');
+  loadPeople();
+}
+
+/* ---------------- period helpers ---------------- */
+const iso=d=>d.toISOString().slice(0,10);
+function defaultPeriod(){
+  const n=new Date();
+  if(n.getDate()>15){ $('from').value=iso(new Date(n.getFullYear(),n.getMonth(),16));
+    $('to').value=iso(new Date(n.getFullYear(),n.getMonth()+1,0)); }
+  else { $('from').value=iso(new Date(n.getFullYear(),n.getMonth(),1));
+    $('to').value=iso(new Date(n.getFullYear(),n.getMonth(),15)); }
+}
+$('btnHalf1').addEventListener('click',()=>{const n=new Date($('to').value||Date.now());
+  $('from').value=iso(new Date(n.getFullYear(),n.getMonth(),1)); $('to').value=iso(new Date(n.getFullYear(),n.getMonth(),15));});
+$('btnHalf2').addEventListener('click',()=>{const n=new Date($('to').value||Date.now());
+  $('from').value=iso(new Date(n.getFullYear(),n.getMonth(),16)); $('to').value=iso(new Date(n.getFullYear(),n.getMonth()+1,0));});
+$('btnPrev').addEventListener('click',()=>{const f=new Date($('from').value);
+  if(f.getDate()===1){ $('from').value=iso(new Date(f.getFullYear(),f.getMonth()-1,16));
+    $('to').value=iso(new Date(f.getFullYear(),f.getMonth(),0)); }
+  else { $('from').value=iso(new Date(f.getFullYear(),f.getMonth(),1)); $('to').value=iso(new Date(f.getFullYear(),f.getMonth(),15)); }});
+
+/* ---------------- attendance check ---------------- */
+$('btnCheck').addEventListener('click',async()=>{
+  busy($('btnCheck'),true); clear($('payMsg'));
+  try{
+    const r=await call({action:'admin.preview',from:$('from').value,to:$('to').value});
+    if(!r.ok){ say($('payMsg'),r.message||r.error,'bad'); return; }
+    renderPreview(r);
+  }catch(e){} finally{ busy($('btnCheck'),false,'Check attendance first'); }
+});
+
+function renderPreview(r){
+  let h='<h2>Attendance</h2>';
+  if(r.problems.length){
+    h+='<div class="msg on warn" style="margin:0 0 12px">'+r.problems.length+
+       ' day'+(r.problems.length>1?'s':'')+' with a missing punch. These pay zero until fixed — tap to fix.</div>';
+    r.problems.forEach((p,i)=>{
+      h+='<div class="card tap" onclick="fixDlg('+i+')"><div class="rowflex"><div>'+
+         '<div class="nm">'+esc(p.name)+'</div><div class="sub">'+esc(p.shown)+
+         (p.firstIn?' · in at '+esc(p.firstIn):'')+'</div></div>'+
+         '<span class="pill warn">Fix</span></div></div>';
+    });
+  }
+  h+='<h2>Hours by employee</h2>';
+  h+=r.summary.map(s=>'<div class="card"><div class="rowflex"><div><div class="nm">'+esc(s.name)+
+     '</div><div class="sub">'+s.days+' days'+(s.absent?' · '+s.absent+' absent':'')+
+     (s.ot?' · '+s.ot+'h OT':'')+'</div></div><div class="amt mono">'+s.hours+'h</div></div></div>').join('')
+     ||'<div class="empty">No records in this period.</div>';
+  $('payOut').innerHTML=h;
+  window.__problems=r.problems;
+}
+
+window.fixDlg=function(i){
+  const p=window.__problems[i];
+  openModal('<h3>Missing punch</h3><p class="who">'+esc(p.name)+' · '+esc(p.shown)+'</p>'+
+    '<div class="msg on warn" style="margin-top:10px">'+esc(p.reason)+'</div>'+
+    '<label>What is missing</label><select id="fxAct"><option value="OUT">Time OUT</option><option value="IN">Time IN</option></select>'+
+    '<label>Time</label><input id="fxTime" type="time" value="17:00">'+
+    '<button class="primary" id="fxGo">Add this punch</button>'+
+    '<p class="sub" style="margin-top:12px">It goes into the log flagged MANUAL, so it stays obvious that a person typed it rather than a phone scanning the poster.</p>');
+  $('fxGo').onclick=async()=>{
+    busy($('fxGo'),true);
+    const r=await call({action:'admin.fixPunch',employeeId:p.employeeId,date:p.date,
+                        time:$('fxTime').value,punchAction:$('fxAct').value});
+    busy($('fxGo'),false,'Add this punch');
+    if(!r.ok) return alert(r.message||r.error);
+    closeModal(); $('btnCheck').click();
+  };
+};
+
+/* ---------------- compute ---------------- */
+$('btnCompute').addEventListener('click',async()=>{
+  busy($('btnCompute'),true); clear($('payMsg'));
+  try{
+    const r=await call({action:'admin.compute',from:$('from').value,to:$('to').value});
+    if(!r.ok){ say($('payMsg'),r.message||r.error,'bad'); return; }
+    LAST=r; renderPayroll(r); renderSlips(r);
+  }catch(e){} finally{ busy($('btnCompute'),false,'Compute payroll'); }
+});
+
+function renderPayroll(r){
+  let h='<div class="total"><div class="lab">Cash to prepare</div>'+
+    '<div class="big mono">₱'+peso(r.total)+'</div>'+
+    '<div class="sub">'+r.rows.length+' employees · '+esc(r.period)+'</div></div>';
+  if(!r.statutory) h+='<div class="msg on warn">Statutory deductions are switched off. These are gross figures.</div>';
+  if(r.review.length) h+='<div class="msg on warn">'+r.review.length+' day(s) excluded for missing punches. Check attendance, fix, recompute.</div>';
+
+  h+='<h2>Per employee</h2>';
+  h+=r.rows.map((p,i)=>'<div class="card tap" onclick="slipDlg('+i+')"><div class="rowflex"><div>'+
+    '<div class="nm">'+esc(p.name)+'</div><div class="sub">'+p.days+' days · '+p.hours+'h'+
+    (p.otHours?' · '+p.otHours+'h OT':'')+(p.issues.length?' · <span style="color:#F0938C">'+p.issues.length+' unfixed</span>':'')+
+    '</div></div><div style="text-align:right"><div class="amt mono">₱'+peso(p.net)+'</div>'+
+    '<div class="sub">of ₱'+peso(p.gross)+'</div></div></div></div>').join('');
+  $('payOut').innerHTML=h;
+}
+
+window.slipDlg=function(i){
+  const p=LAST.rows[i];
+  const line=(l,v,neg)=>v?'<div class="line"><span>'+l+'</span><span class="mono'+(neg?' neg':'')+'">'+
+    (neg?'(':'')+peso(v)+(neg?')':'')+'</span></div>':'';
+  let adj=p.adjustments.map(a=>'<div class="line"><span>'+esc(a.label)+'</span><span class="mono'+
+    (a.type==='DEDUCT'?' neg':'')+'">'+(a.type==='DEDUCT'?'(':'')+peso(a.amount)+(a.type==='DEDUCT'?')':'')+
+    ' <button class="linkbtn" onclick="dropAdj(\''+p.employeeId+'\',\''+esc(a.label).replace(/'/g,"")+'\')">remove</button></span></div>').join('');
+
+  openModal('<h3>'+esc(p.name)+'</h3><p class="who">'+esc(p.employeeId)+' · '+esc(LAST.period)+'</p>'+
+    '<div class="slip"><div class="head">Earnings</div>'+
+      line('Basic pay',p.regularPay)+line('Overtime',p.otPay)+line('Night differential',p.nightPay)+
+      line('Holiday pay',p.holidayPay)+line('Allowance',p.allowance)+
+      '<div class="line tot"><span>Gross</span><span class="mono">'+peso(p.gross)+'</span></div>'+
+      (p.deductions? '<div class="head">Deductions</div>'+
+        line('SSS',p.sss,1)+line('PhilHealth',p.philhealth,1)+line('Pag-IBIG',p.pagibig,1)+
+        line('Withholding tax',p.tax,1)+adj : adj)+
+      '<div class="line net"><span>Net pay</span><span class="mono">₱'+peso(p.net)+'</span></div>'+
+    '</div>'+
+    '<label>Add a cash advance, loan or bonus</label>'+
+    '<input id="adjLabel" placeholder="Cash advance">'+
+    '<div class="two" style="margin-top:10px">'+
+      '<input id="adjAmt" class="mono" type="number" inputmode="decimal" placeholder="0.00">'+
+      '<select id="adjType"><option value="DEDUCT">Deduct</option><option value="ADD">Add</option></select>'+
+    '</div>'+
+    '<button class="primary" id="adjGo">Save and recompute</button>');
+
+  $('adjGo').onclick=async()=>{
+    busy($('adjGo'),true);
+    const r=await call({action:'admin.addAdjust',employeeId:p.employeeId,periodEnd:LAST.periodEnd,
+                        label:$('adjLabel').value||'Adjustment',amount:$('adjAmt').value,type:$('adjType').value});
+    busy($('adjGo'),false,'Save and recompute');
+    if(!r.ok) return alert(r.message||r.error);
+    closeModal(); $('btnCompute').click();
+  };
+};
+
+window.dropAdj=async function(id,label){
+  const r=await call({action:'admin.dropAdjust',employeeId:id,periodEnd:LAST.periodEnd,label});
+  if(!r.ok) return alert(r.message||r.error);
+  closeModal(); $('btnCompute').click();
+};
+
+/* ---------------- people ---------------- */
+async function loadPeople(){
+  const r=await call({action:'admin.people'});
+  if(!r.ok) return;
+  PEOPLE=r.people;
+  $('peopleOut').innerHTML = PEOPLE.length ? PEOPLE.map((p,i)=>
+    '<div class="card tap" onclick="personDlg('+i+')"><div class="rowflex"><div>'+
+    '<div class="nm">'+esc(p.name)+'</div><div class="sub">'+esc(p.employeeId)+
+    (p.department?' · '+esc(p.department):'')+' · ₱'+peso(p.rate)+'/'+(p.rateType==='MONTHLY'?'mo':'day')+
+    '</div></div>'+
+    (!p.active?'<span class="pill off">Inactive</span>':
+      !p.rate?'<span class="pill warn">No rate</span>':
+      !p.devices?'<span class="pill warn">No phone</span>':'<span class="pill">Ready</span>')+
+    '</div></div>').join('') : '<div class="empty">No employees yet.</div>';
+}
+
+$('btnNew').addEventListener('click',()=>personDlg(-1));
+
+window.personDlg=function(i){
+  const p = i<0 ? {employeeId:'',name:'',department:'',homeSite:'',active:true,rateType:'DAILY',
+                   rate:'',allowance:0,shiftStart:'08:00',shiftEnd:'17:00',restDays:'SUN',grace:15,devices:0,hasCode:false}
+                : PEOPLE[i];
+  const siteOpts=(BOOT.sites||[]).map(s=>'<option value="'+esc(s.id)+'"'+(p.homeSite===s.id?' selected':'')+'>'+esc(s.name)+'</option>').join('');
+
+  openModal('<h3>'+(i<0?'New employee':esc(p.name))+'</h3>'+
+    '<label>Employee ID</label><input id="fId" class="mono" value="'+esc(p.employeeId)+'" '+(i<0?'placeholder="EMP-003"':'readonly')+'>'+
+    '<label>Full name</label><input id="fName" value="'+esc(p.name)+'">'+
+    '<div class="two"><div><label>Department</label><input id="fDept" value="'+esc(p.department)+'"></div>'+
+    '<div><label>Branch</label><select id="fSite"><option value="">—</option>'+siteOpts+'</select></div></div>'+
+
+    '<h2>Pay</h2>'+
+    '<div class="two"><div><label>Rate type</label><select id="fType">'+
+      '<option value="DAILY"'+(p.rateType==='DAILY'?' selected':'')+'>Daily</option>'+
+      '<option value="MONTHLY"'+(p.rateType==='MONTHLY'?' selected':'')+'>Monthly</option></select></div>'+
+    '<div><label>Rate</label><input id="fRate" class="mono" type="number" inputmode="decimal" value="'+(p.rate||'')+'"></div></div>'+
+    '<label>Daily allowance (COLA, meal)</label><input id="fAllow" class="mono" type="number" inputmode="decimal" value="'+(p.allowance||0)+'">'+
+
+    '<h2>Schedule</h2>'+
+    '<div class="two"><div><label>Shift start</label><input id="fIn" type="time" value="'+esc(p.shiftStart)+'"></div>'+
+    '<div><label>Shift end</label><input id="fOut" type="time" value="'+esc(p.shiftEnd)+'"></div></div>'+
+    '<div class="two"><div><label>Rest days</label><input id="fRest" class="mono" value="'+esc(p.restDays)+'" placeholder="SUN"></div>'+
+    '<div><label>Grace (min)</label><input id="fGrace" class="mono" type="number" value="'+(p.grace||0)+'"></div></div>'+
+    '<label style="margin-top:16px"><input type="checkbox" id="fActive" '+(p.active?'checked':'')+
+      ' style="width:auto;margin-right:8px">Active</label>'+
+
+    '<button class="primary" id="fSave">Save</button>'+
+    (i<0?'':'<div class="rowflex" style="margin-top:12px;gap:8px">'+
+      '<button class="sec" style="flex:1" id="fCode">Issue phone code</button>'+
+      '<button class="sec" style="flex:1" id="fDev">Phones ('+p.devices+')</button></div>')+
+    '<div class="msg" id="fMsg"></div>');
+
+  $('fSave').onclick=async()=>{
+    busy($('fSave'),true);
+    const person={employeeId:$('fId').value,name:$('fName').value,department:$('fDept').value,
+      homeSite:$('fSite').value,active:$('fActive').checked,rateType:$('fType').value,
+      rate:$('fRate').value,allowance:$('fAllow').value,shiftStart:$('fIn').value,
+      shiftEnd:$('fOut').value,restDays:$('fRest').value,grace:$('fGrace').value};
+    const r=await call({action:'admin.savePerson',person});
+    busy($('fSave'),false,'Save');
+    if(!r.ok) return say($('fMsg'),r.message||r.error,'bad');
+    say($('fMsg'),r.message,'good');
+    loadPeople(); setTimeout(closeModal,700);
+  };
+
+  if(i>=0){
+    $('fCode').onclick=async()=>{
+      const r=await call({action:'admin.issueCode',employeeId:p.employeeId});
+      if(!r.ok) return say($('fMsg'),r.message||r.error,'bad');
+      say($('fMsg'),'Code for '+r.name+': '+r.code+'  — works once. Send it to them now.','good');
+    };
+    $('fDev').onclick=async()=>{
+      const r=await call({action:'admin.devices',employeeId:p.employeeId});
+      if(!r.ok) return;
+      openModal('<h3>Registered phones</h3><p class="who">'+esc(p.name)+'</p>'+
+        (r.devices.length? r.devices.map(d=>'<div class="card"><div class="rowflex"><div>'+
+          '<div class="nm">'+esc(d.label)+'</div><div class="sub">'+(d.lastSeen?'last used '+esc(d.lastSeen):'never used')+'</div></div>'+
+          (d.approved?'<button class="sec danger" onclick="revoke('+d.row+')">Revoke</button>':'<span class="pill off">Revoked</span>')+
+          '</div></div>').join('') : '<div class="empty">No phones registered.</div>'));
+    };
+  }
+};
+
+window.revoke=async function(row){
+  if(!confirm('Revoke this phone? They will need a new code to clock in.')) return;
+  const r=await call({action:'admin.revoke',row});
+  alert(r.ok?r.message:(r.message||r.error));
+  closeModal(); loadPeople();
+};
+
+/* ---------------- payslips ---------------- */
+function renderSlips(r){
+  $('slipOut').innerHTML='<div style="margin-top:12px">'+r.rows.map(p=>{
+    const line=(l,v,neg)=>v?'<div class="line"><span>'+l+'</span><span class="mono'+(neg?' neg':'')+'">'+
+      (neg?'(':'')+peso(v)+(neg?')':'')+'</span></div>':'';
+    return '<div class="slip"><div class="rowflex"><strong>'+esc(p.name)+'</strong>'+
+      '<span class="mono" style="font-size:12px;color:#847F73">'+esc(p.employeeId)+'</span></div>'+
+      '<div class="head">'+esc(r.period)+' · '+p.days+' days</div>'+
+      line('Basic pay',p.regularPay)+line('Overtime',p.otPay)+line('Night differential',p.nightPay)+
+      line('Holiday pay',p.holidayPay)+line('Allowance',p.allowance)+
+      '<div class="line tot"><span>Gross</span><span class="mono">'+peso(p.gross)+'</span></div>'+
+      line('SSS',p.sss,1)+line('PhilHealth',p.philhealth,1)+line('Pag-IBIG',p.pagibig,1)+
+      line('Withholding tax',p.tax,1)+line('Other deductions',p.other,1)+
+      '<div class="line net"><span>Net pay</span><span class="mono">'+peso(p.net)+'</span></div>'+
+      '<div class="line" style="margin-top:14px;font-size:11px;color:#847F73">'+
+      '<span>Received by ______________________</span><span>Date ____________</span></div></div>';
+  }).join('')+'</div>';
+}
+$('btnPrint').addEventListener('click',()=>window.print());
+
+/* ---------------- chrome ---------------- */
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['tabPay','tabPeople','tabSlips'].forEach(t=>$(t).style.display = t===b.dataset.tab?'block':'none');
+  window.scrollTo(0,0);
+}));
+
+function openModal(html){ $('modalBody').innerHTML=html; $('modalWrap').classList.add('on'); $('modal').scrollTop=0; }
+function closeModal(){ $('modalWrap').classList.remove('on'); }
+$('modalWrap').addEventListener('click',e=>{ if(e.target===$('modalWrap')) closeModal(); });
+
+if(TOKEN) enter().catch(()=>signOut(''));
+</script>
+</body>
+</html>
